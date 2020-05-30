@@ -3,7 +3,7 @@
 //! To avoid users having to download all the files they are downloaded as they
 //! are needed and cached in the `/target` directory.
 //!
-//! ```rust
+//! ```no_run
 //! use dicom_test_files;
 //!
 //! dicom_test_files::path("pydicom/liver.dcm").unwrap();
@@ -53,7 +53,13 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
 }
 
 pub(crate) fn get_data_path() -> PathBuf {
-    PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("target").join("dicom_test_files")
+    let mut target_dir = PathBuf::from(env::current_exe().expect("exe path").parent().expect("exe parent"));
+    while target_dir.file_name() != Some(std::ffi::OsStr::new("target")) {
+        if !target_dir.pop() {
+            panic!("Cannot find target directory");
+        }
+    }
+    target_dir.join("dicom_test_files")
 }
 
 const GITHUB_BASE_URL: &str = "https://raw.githubusercontent.com/robyoung/dicom-test-files/master/data/";
