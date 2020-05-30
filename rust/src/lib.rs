@@ -13,7 +13,9 @@
 use std::{env, fs, io, path::{PathBuf, Path}};
 use sha2::{Sha256, Digest};
 
-include!(concat!(env!("OUT_DIR"), "/hashes.rs"));
+mod hashes;
+
+use crate::hashes::FILE_HASHES;
 
 /// Error type for test_dicom_files
 #[derive(Debug)]
