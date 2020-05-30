@@ -1,0 +1,16 @@
+[package]
+name = "dicom-test-files"
+version = "0.1.0"
+authors = ["Rob Young <rob@robyoung.digital>"]
+edition = "2018"
+description = "A collection of DICOM files for testing DICOM parsers." 
+license-file = "../LICENSE.txt"
+keywords = ["DICOM", "medical", "image"]
+categories = ["development-tools::testing", "parsing"]
+
+[dependencies]
+ureq = "1.1"
+sha2 = "0.8"
+
+[build-dependencies]
+sha2 = "0.8"
