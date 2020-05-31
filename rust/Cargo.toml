@@ -1,6 +1,6 @@
 [package]
 name = "dicom-test-files"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Rob Young <rob@robyoung.digital>"]
 edition = "2018"
 description = "A collection of DICOM files for testing DICOM parsers." 

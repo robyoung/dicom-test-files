@@ -10,8 +10,11 @@
 //! ```
 #![deny(missing_docs)]
 
-use std::{env, fs, io, path::{PathBuf, Path}};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
+use std::{
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 
 mod hashes;
 
@@ -52,8 +55,24 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
     Ok(cached_path)
 }
 
+/// Return a vector of local paths to all DICOM files
+///
+/// This function will download and cache the file locally in `target/dicom_test_files`
+/// if it has not already been downloaded.
+pub fn all() -> Result<Vec<PathBuf>, Error> {
+    FILE_HASHES
+        .iter()
+        .map(|(name, _)| path(name))
+        .collect::<Result<Vec<PathBuf>, Error>>()
+}
+
 pub(crate) fn get_data_path() -> PathBuf {
-    let mut target_dir = PathBuf::from(env::current_exe().expect("exe path").parent().expect("exe parent"));
+    let mut target_dir = PathBuf::from(
+        env::current_exe()
+            .expect("exe path")
+            .parent()
+            .expect("exe parent"),
+    );
     while target_dir.file_name() != Some(std::ffi::OsStr::new("target")) {
         if !target_dir.pop() {
             panic!("Cannot find target directory");
@@ -62,7 +81,8 @@ pub(crate) fn get_data_path() -> PathBuf {
     target_dir.join("dicom_test_files")
 }
 
-const GITHUB_BASE_URL: &str = "https://raw.githubusercontent.com/robyoung/dicom-test-files/master/data/";
+const GITHUB_BASE_URL: &str =
+    "https://raw.githubusercontent.com/robyoung/dicom-test-files/master/data/";
 
 fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     check_hash_exists(name)?;
@@ -85,7 +105,7 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
 fn check_hash_exists(name: &str) -> Result<(), Error> {
     for (hash_name, _) in FILE_HASHES.iter() {
         if *hash_name == name {
-            return Ok(())
+            return Ok(());
         }
     }
     Err(Error::NotFound)
@@ -128,5 +148,11 @@ mod tests {
 
         assert_eq!(path.file_name().unwrap(), "liver.dcm");
         assert!(path.exists());
+    }
+
+    #[test]
+    fn load_all_paths() {
+        let all = all().unwrap();
+        assert_eq!(all.len(), 126);
     }
 }
