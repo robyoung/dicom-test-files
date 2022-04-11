@@ -9,9 +9,9 @@ keywords = ["DICOM", "medical", "image"]
 categories = ["development-tools::testing", "parsing"]
 
 [dependencies]
-ureq = "1.1"
-sha2 = "0.8"
+ureq = "2.4"
+sha2 = "0.10"
 tempfile = "3.3.0"
 
 [build-dependencies]
-sha2 = "0.8"
+sha2 = "0.10"

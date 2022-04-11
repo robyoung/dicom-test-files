@@ -91,10 +91,9 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     fs::create_dir_all(target_parent_dir)?;
 
     let url = GITHUB_BASE_URL.to_owned() + name;
-    let resp = ureq::get(&url).call();
-    if !resp.ok() {
-        return Err(Error::Download(format!("Failed to download {}", url)));
-    }
+    let resp = ureq::get(&url)
+        .call()
+        .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
 
     // write into temporary file first
     let tempdir = tempfile::tempdir_in(target_parent_dir)?;
@@ -127,7 +126,7 @@ fn check_hash(path: &Path, name: &str) -> Result<(), Error> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Sha256::new();
     io::copy(&mut file, &mut hasher)?;
-    let hash = hasher.result();
+    let hash = hasher.finalize();
 
     for (hash_name, file_hash) in FILE_HASHES.iter() {
         if *hash_name == name {
