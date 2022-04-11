@@ -87,15 +87,27 @@ const GITHUB_BASE_URL: &str =
 fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     check_hash_exists(name)?;
 
-    fs::create_dir_all(cached_path.as_path().parent().unwrap())?;
+    let target_parent_dir = cached_path.as_path().parent().unwrap();
+    fs::create_dir_all(target_parent_dir)?;
 
     let url = GITHUB_BASE_URL.to_owned() + name;
     let resp = ureq::get(&url).call();
     if !resp.ok() {
         return Err(Error::Download(format!("Failed to download {}", url)));
     }
-    let mut target = fs::File::create(cached_path.as_path())?;
-    std::io::copy(&mut resp.into_reader(), &mut target)?;
+
+    // write into temporary file first
+    let tempdir = tempfile::tempdir_in(target_parent_dir)?;
+    let mut tempfile_path = tempdir.into_path();
+    tempfile_path.push("tmpfile");
+
+    {
+        let mut target = fs::File::create(tempfile_path.as_path())?;
+        std::io::copy(&mut resp.into_reader(), &mut target)?;
+    }
+
+    // move to target destination
+    fs::rename(tempfile_path, cached_path.as_path())?;
 
     check_hash(cached_path.as_path(), name)?;
 
@@ -136,18 +148,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn load_a_single_path() {
+    fn load_a_single_path_1() {
         // ensure it does not exist
         let cached_path = get_data_path().join("pydicom/liver.dcm");
-        if cached_path.exists() {
-            fs::remove_file(cached_path).unwrap();
-        }
+        let _ = fs::remove_file(cached_path);
 
         let path = path("pydicom/liver.dcm").unwrap();
         let path = path.as_path();
 
         assert_eq!(path.file_name().unwrap(), "liver.dcm");
         assert!(path.exists());
+    }
+
+    fn load_a_single_path_2() {
+        // ensure it does not exist
+        let cached_path = get_data_path().join("pydicom/CT_small.dcm");
+        let _ = fs::remove_file(cached_path);
+
+        let path = path("pydicom/CT_small.dcm").unwrap();
+        let path = path.as_path();
+
+        assert_eq!(path.file_name().unwrap(), "CT_small.dcm");
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn load_a_single_path_concurrent() {
+        let handles: Vec<_> = (0..4)
+            .map(|_| std::thread::spawn(load_a_single_path_2))
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
     }
 
     #[test]
