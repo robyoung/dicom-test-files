@@ -7,6 +7,7 @@ description = "A collection of DICOM files for testing DICOM parsers."
 license-file = "../LICENSE.txt"
 keywords = ["DICOM", "medical", "image"]
 categories = ["development-tools::testing", "parsing"]
+readme = "../README.md"
 
 [dependencies]
 ureq = "2.4"
