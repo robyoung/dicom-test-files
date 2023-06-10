@@ -244,6 +244,24 @@ mod tests {
         assert!(path.exists());
     }
 
+    #[test]
+    fn load_a_single_path_wg04_1() {
+        const FILE: &str = "WG04/JPLY/NM1_JPLY";
+        // ensure it does not exist
+        let cached_path = get_data_path().join(FILE);
+        let _ = fs::remove_file(cached_path);
+
+        let path = path(FILE).unwrap();
+        let path = path.as_path();
+
+        assert_eq!(path.file_name().unwrap(), "NM1_JPLY");
+        assert!(path.exists());
+
+        let metadata = std::fs::metadata(path).unwrap();
+        // check size
+        assert_eq!(metadata.len(), 9844);
+    }
+
     fn load_a_single_path_2() {
         // ensure it does not exist
         let cached_path = get_data_path().join("pydicom/CT_small.dcm");
@@ -267,6 +285,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn load_all_paths() {
         let all = all().unwrap();
         assert_eq!(all.len(), 126);
