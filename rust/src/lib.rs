@@ -3,16 +3,28 @@
 //! To avoid users having to download all the files they are downloaded as they
 //! are needed and cached in the `/target` directory.
 //!
-//! ```no_run
-//! use dicom_test_files;
+//! The [`path`] function will automatically download the requested file
+//! and return a file path.
 //!
-//! dicom_test_files::path("pydicom/liver.dcm").unwrap();
+//! ```no_run
+//! use dicom_test_files::path;
+//!
+//! # fn main() -> Result<(), dicom_test_files::Error> {
+//! let liver = path("pydicom/liver.dcm")?;
+//! // then open the file as you will (e.g. using DICOM-rs)
+//! # /*
+//! let dicom_data = dicom::object::open(liver);
+//! # */
+//! # Ok(())
+//! # }
 //! ```
 #![deny(missing_docs)]
 
 use sha2::{Digest, Sha256};
 use std::{
-    env, fs, io,
+    borrow::Cow,
+    env::{self, VarError},
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -35,6 +47,8 @@ pub enum Error {
     Download(String),
     /// Wrapped errors from std::io
     Io(io::Error),
+    /// Failed to resolve data source URL
+    ResolveUrl(VarError),
 }
 
 impl From<io::Error> for Error {
@@ -66,6 +80,7 @@ pub fn all() -> Result<Vec<PathBuf>, Error> {
         .collect::<Result<Vec<PathBuf>, Error>>()
 }
 
+/// Determine the target data path
 pub(crate) fn get_data_path() -> PathBuf {
     let mut target_dir = PathBuf::from(
         env::current_exe()
@@ -81,8 +96,52 @@ pub(crate) fn get_data_path() -> PathBuf {
     target_dir.join("dicom_test_files")
 }
 
-const GITHUB_BASE_URL: &str =
+const DEFAULT_GITHUB_BASE_URL: &str =
     "https://raw.githubusercontent.com/robyoung/dicom-test-files/master/data/";
+
+const RAW_GITHUBUSERCONTENT_URL: &str = "https://raw.githubusercontent.com";
+
+/// Determine the base URL in this environment.
+///
+/// When this is part of a pull request to the project,
+/// use the contents provided through the pull request's head branch.
+fn base_url() -> Result<Cow<'static, str>, VarError> {
+    if let Ok(url) = std::env::var("DICOM_TEST_FILES_URL") {
+        if url != "" {
+            let url = if !url.ends_with("/") {
+                format!("{url}/")
+            } else {
+                url
+            };
+            return Ok(url.into());
+        }
+    }
+
+    // CI: always true on GitHub Actions
+    let ci = std::env::var("CI").unwrap_or_default();
+    if ci == "true" {
+        // GITHUB_REPOSITORY
+        let github_repository = std::env::var("GITHUB_REPOSITORY").unwrap_or_default();
+
+        // only do this if target repository is dicom-test-files
+        if github_repository.ends_with("/dicom-test-files") {
+            // GITHUB_EVENT_NAME: can be pull_request
+            let github_event_name = std::env::var("GITHUB_EVENT_NAME")?;
+            if github_event_name == "pull_request" {
+                // GITHUB_HEAD_REF: name of the branch when it's a pull request
+                let github_head_ref = std::env::var("GITHUB_HEAD_REF")?;
+                let url = format!(
+                    "{}/{}/{}/data/",
+                    RAW_GITHUBUSERCONTENT_URL, github_repository, github_head_ref
+                );
+
+                return Ok(url.into());
+            }
+        }
+    }
+
+    Ok(DEFAULT_GITHUB_BASE_URL.into())
+}
 
 fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     check_hash_exists(name)?;
@@ -90,7 +149,7 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     let target_parent_dir = cached_path.as_path().parent().unwrap();
     fs::create_dir_all(target_parent_dir)?;
 
-    let url = GITHUB_BASE_URL.to_owned() + name;
+    let url = base_url().map_err(Error::ResolveUrl)?.to_owned() + name;
     let resp = ureq::get(&url)
         .call()
         .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
