@@ -18,6 +18,27 @@
 //! # Ok(())
 //! # }
 //! ```
+//! 
+//! ## Source of data
+//! 
+//! By default,
+//! all data sets are hosted in
+//! the `dicom-test-files` project's [main repository][1],
+//! in the `data` folder.
+//! Inspect this folder to know what DICOM test files are available.
+//!
+//! To override this source,
+//! you can set the environment variable `DICOM_TEST_FILES_URL`
+//! to the base path of the data set's raw contents
+//! (usually ending with `data` or `data/`).
+//! 
+//! ```sh
+//! set DICOM_TEST_FILES_URL=https://raw.githubusercontent.com/Me/dicom-test-files/new/more-dicom/data
+//! cargo test
+//! ```
+//! 
+//! [1]: https://github.com/robyoung/dicom-test-files/tree/master/data
+
 #![deny(missing_docs)]
 
 use sha2::{Digest, Sha256};
@@ -57,10 +78,12 @@ impl From<io::Error> for Error {
     }
 }
 
-/// Return the local path for a given DICOM file
+/// Fetch a DICOM file by its relative path (`name`)
+/// if it has not been downloaded yet,
+/// and return its path in the local file system.
 ///
-/// This function will download and cache the file locally in `target/dicom_test_files`
-/// if it has not already been downloaded.
+/// This function will download and cache the file locally in
+/// `target/dicom_test_files`.
 pub fn path(name: &str) -> Result<PathBuf, Error> {
     let cached_path = get_data_path().join(name);
     if !cached_path.exists() {
@@ -69,10 +92,13 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
     Ok(cached_path)
 }
 
-/// Return a vector of local paths to all DICOM files
+/// Return a vector of local paths to all DICOM test files available.
 ///
-/// This function will download and cache the file locally in `target/dicom_test_files`
-/// if it has not already been downloaded.
+/// This function will download any test file not yet in the file system
+/// and cache the files locally to `target/dicom_test_files`.
+///
+/// Note that this operation may be unnecessarily expensive.
+/// Retrieving only the files that you need via [`path`] is preferred.
 pub fn all() -> Result<Vec<PathBuf>, Error> {
     FILE_HASHES
         .iter()
