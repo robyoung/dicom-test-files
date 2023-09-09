@@ -98,7 +98,7 @@ fn lookup(name: &str) -> Option<&'static TestFile> {
 /// `target/dicom_test_files`.
 pub fn path(name: &str) -> Result<PathBuf, Error> {
     let entry = lookup(name).ok_or(Error::NotFound)?;
-    let cached_path = get_data_path().join(entry.real_os_file_name());
+    let cached_path = get_data_path().join(entry.name);
     if !cached_path.exists() {
         download(name, &cached_path)?;
     }
@@ -200,10 +200,11 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     tempfile_path.push("tmpfile");
 
     {
-        let mut target = fs::File::create(tempfile_path.as_path())?;
+        let mut target = fs::File::create(&tempfile_path)?;
         std::io::copy(&mut resp.into_reader(), &mut target)?;
     }
 
+    check_hash(&tempfile_path, file_entry)?;
     match file_entry.compression {
         Compression::None => {
             // move to target destination
@@ -212,10 +213,13 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
         Compression::Zstd => {
             // decode and write to target destination
             write_zstd(tempfile_path.as_path(), cached_path.as_path())?;
+
+            // remove temporary file
+            fs::remove_file(tempfile_path).unwrap_or_else(|e| {
+                eprintln!("[dicom-test-files] Failed to remove temporary file: {}", e);
+            });
         }
     }
-
-    check_hash(cached_path.as_path(), file_entry)?;
 
     Ok(())
 }
@@ -280,6 +284,25 @@ mod tests {
         let metadata = std::fs::metadata(path).unwrap();
         // check size
         assert_eq!(metadata.len(), 9844);
+    }
+
+    #[cfg(feature = "zstd")]
+    #[test]
+    fn load_path_wg04_unc_1() {
+        const FILE: &str = "WG04/REF/NM1_UNC";
+        // ensure it does not exist beforehand
+        let cached_path = get_data_path().join(FILE);
+        let _ = fs::remove_file(cached_path);
+
+        let path = path(FILE).unwrap();
+        let path = path.as_path();
+
+        assert_eq!(path.file_name().unwrap(), "NM1_UNC");
+        assert!(path.exists());
+
+        let metadata = std::fs::metadata(path).unwrap();
+        // check size
+        assert_eq!(metadata.len(), 527066);
     }
 
     fn load_a_single_path_2() {

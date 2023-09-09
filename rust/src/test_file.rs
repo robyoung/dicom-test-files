@@ -1,6 +1,7 @@
 //! Test file base data structures
 
-use std::{borrow::Cow, ffi::{OsStr, OsString}};
+use std::borrow::Cow;
+
 #[derive(Debug)]
 pub enum Compression {
     /// no compression
@@ -41,13 +42,6 @@ impl TestFile {
         match self.compression {
             Compression::None => Cow::Borrowed(self.name),
             Compression::Zstd => Cow::Owned(format!("{}.zst", self.name)),
-        }
-    }
-
-    pub fn real_os_file_name(&self) -> Cow<'static, OsStr> {
-        match self.compression {
-            Compression::None => Cow::Borrowed(OsStr::new(self.name)),
-            Compression::Zstd => Cow::Owned(OsString::from(format!("{}.zst", self.name))),
         }
     }
 }
