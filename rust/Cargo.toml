@@ -9,10 +9,19 @@ keywords = ["DICOM", "medical", "image"]
 categories = ["development-tools::testing", "parsing"]
 readme = "../README.md"
 
+[features]
+default = ["zstd"]
+zstd = ["dep:zstd"]
+
 [dependencies]
 ureq = "2.4"
 sha2 = "0.10"
 tempfile = "3.3.0"
+
+[dependencies.zstd]
+version = "0.12.4"
+default-features = false
+optional = true
 
 [build-dependencies]
 sha2 = "0.10"
