@@ -13,7 +13,7 @@ def test_files():
             if file_name.endswith('.zst'):
                 compression = 'zstd'
                 # remove extension to abstract compression away
-                path = path[:-4]
+                name = name[:-4]
             else:
                 compression = 'none'
             yield (name, compression, hash)
