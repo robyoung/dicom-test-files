@@ -99,6 +99,7 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
 ///
 /// Note that this operation may be unnecessarily expensive.
 /// Retrieving only the files that you need via [`path`] is preferred.
+#[deprecated(note = "Too expensive. Use `path` for the files that you need.")]
 pub fn all() -> Result<Vec<PathBuf>, Error> {
     FILE_HASHES
         .iter()
@@ -282,12 +283,5 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
-    }
-
-    #[test]
-    #[ignore]
-    fn load_all_paths() {
-        let all = all().unwrap();
-        assert_eq!(all.len(), 126);
     }
 }
