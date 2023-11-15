@@ -42,6 +42,7 @@
 #![deny(missing_docs)]
 
 use sha2::{Digest, Sha256};
+use test_file::{TestFile, Compression};
 use std::{
     borrow::Cow,
     env::{self, VarError},
@@ -49,9 +50,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-mod hashes;
+mod entries;
 
-use crate::hashes::FILE_HASHES;
+pub(crate) mod test_file;
+
+
+use entries::FILE_ENTRIES;
 
 /// Error type for test_dicom_files
 #[derive(Debug)]
@@ -70,12 +74,20 @@ pub enum Error {
     Io(io::Error),
     /// Failed to resolve data source URL
     ResolveUrl(VarError),
+    /// Feature "zstd" is required for this file 
+    ZstdRequired,
 }
 
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::Io(err)
     }
+}
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+fn lookup(name: &str) -> Option<&'static TestFile> {
+    FILE_ENTRIES.iter().find(|entry| entry.name == name)
 }
 
 /// Fetch a DICOM file by its relative path (`name`)
@@ -85,7 +97,8 @@ impl From<io::Error> for Error {
 /// This function will download and cache the file locally in
 /// `target/dicom_test_files`.
 pub fn path(name: &str) -> Result<PathBuf, Error> {
-    let cached_path = get_data_path().join(name);
+    let entry = lookup(name).ok_or(Error::NotFound)?;
+    let cached_path = get_data_path().join(entry.name);
     if !cached_path.exists() {
         download(name, &cached_path)?;
     }
@@ -99,10 +112,11 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
 ///
 /// Note that this operation may be unnecessarily expensive.
 /// Retrieving only the files that you need via [`path`] is preferred.
+#[deprecated(note = "Too expensive. Use `path` for the files that you need.")]
 pub fn all() -> Result<Vec<PathBuf>, Error> {
-    FILE_HASHES
+    FILE_ENTRIES
         .iter()
-        .map(|(name, _)| path(name))
+        .map(|TestFile { name, ..}| path(name))
         .collect::<Result<Vec<PathBuf>, Error>>()
 }
 
@@ -170,12 +184,12 @@ fn base_url() -> Result<Cow<'static, str>, VarError> {
 }
 
 fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
-    check_hash_exists(name)?;
+    let file_entry = lookup(name).ok_or(Error::NotFound)?;
 
     let target_parent_dir = cached_path.as_path().parent().unwrap();
     fs::create_dir_all(target_parent_dir)?;
 
-    let url = base_url().map_err(Error::ResolveUrl)?.to_owned() + name;
+    let url = base_url().map_err(Error::ResolveUrl)?.to_owned() + file_entry.real_file_name();
     let resp = ureq::get(&url)
         .call()
         .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
@@ -186,45 +200,55 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     tempfile_path.push("tmpfile");
 
     {
-        let mut target = fs::File::create(tempfile_path.as_path())?;
+        let mut target = fs::File::create(&tempfile_path)?;
         std::io::copy(&mut resp.into_reader(), &mut target)?;
     }
 
-    // move to target destination
-    fs::rename(tempfile_path, cached_path.as_path())?;
+    check_hash(&tempfile_path, file_entry)?;
+    match file_entry.compression {
+        Compression::None => {
+            // move to target destination
+            fs::rename(tempfile_path, cached_path.as_path())?;
+        },
+        Compression::Zstd => {
+            // decode and write to target destination
+            write_zstd(tempfile_path.as_path(), cached_path.as_path())?;
 
-    check_hash(cached_path.as_path(), name)?;
+            // remove temporary file
+            fs::remove_file(tempfile_path).unwrap_or_else(|e| {
+                eprintln!("[dicom-test-files] Failed to remove temporary file: {}", e);
+            });
+        }
+    }
 
     Ok(())
 }
 
-fn check_hash_exists(name: &str) -> Result<(), Error> {
-    for (hash_name, _) in FILE_HASHES.iter() {
-        if *hash_name == name {
-            return Ok(());
-        }
-    }
-    Err(Error::NotFound)
+#[cfg(feature = "zstd")]
+fn write_zstd(source_path: impl AsRef<Path>, cached_path: impl AsRef<Path>) -> Result<()> {
+    let mut decoder = zstd::Decoder::new(fs::File::open(source_path)?)?;
+    let mut target = fs::File::create(cached_path)?;
+    std::io::copy(&mut decoder, &mut target)?;
+    Ok(())
 }
 
-fn check_hash(path: &Path, name: &str) -> Result<(), Error> {
-    let mut file = fs::File::open(path)?;
+#[cfg(not(feature = "zstd"))]
+fn write_zstd(_source_path: impl AsRef<Path>, _cached_path: impl AsRef<Path>) -> Result<()> {
+    Err(Error::ZstdRequired)
+}
+
+fn check_hash(path: impl AsRef<Path>, file_entry: &TestFile) -> Result<()> {
+    let mut file = fs::File::open(path.as_ref())?;
     let mut hasher = Sha256::new();
     io::copy(&mut file, &mut hasher)?;
     let hash = hasher.finalize();
 
-    for (hash_name, file_hash) in FILE_HASHES.iter() {
-        if *hash_name == name {
-            if format!("{:x}", hash) == *file_hash {
-                return Ok(());
-            } else {
-                fs::remove_file(path)?;
-                return Err(Error::InvalidHash);
-            }
-        }
+    if format!("{:x}", hash) != file_entry.hash {
+        fs::remove_file(path)?;
+        return Err(Error::InvalidHash);
     }
 
-    unreachable!("file existance was checked before downloading");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -262,6 +286,25 @@ mod tests {
         assert_eq!(metadata.len(), 9844);
     }
 
+    #[cfg(feature = "zstd")]
+    #[test]
+    fn load_path_wg04_unc_1() {
+        const FILE: &str = "WG04/REF/NM1_UNC";
+        // ensure it does not exist beforehand
+        let cached_path = get_data_path().join(FILE);
+        let _ = fs::remove_file(cached_path);
+
+        let path = path(FILE).unwrap();
+        let path = path.as_path();
+
+        assert_eq!(path.file_name().unwrap(), "NM1_UNC");
+        assert!(path.exists());
+
+        let metadata = std::fs::metadata(path).unwrap();
+        // check size
+        assert_eq!(metadata.len(), 527066);
+    }
+
     fn load_a_single_path_2() {
         // ensure it does not exist
         let cached_path = get_data_path().join("pydicom/CT_small.dcm");
@@ -282,12 +325,5 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
-    }
-
-    #[test]
-    #[ignore]
-    fn load_all_paths() {
-        let all = all().unwrap();
-        assert_eq!(all.len(), 126);
     }
 }
