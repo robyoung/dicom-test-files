@@ -1,11 +1,12 @@
 [package]
 name = "dicom-test-files"
-version = "0.2.1"
-authors = ["Rob Young <rob@robyoung.digital>"]
+version = "0.3.0"
+authors = ["Rob Young <rob@robyoung.digital>", "Eduardo Pinho <enet4mikeenet@gmail.com>"]
 edition = "2018"
 description = "A collection of DICOM files for testing DICOM parsers." 
+repository = "https://github.com/robyoung/dicom-test-files"
 license-file = "../LICENSE.txt"
-keywords = ["DICOM", "medical", "image"]
+keywords = ["DICOM", "medical", "image", "dataset"]
 categories = ["development-tools::testing", "parsing"]
 readme = "../README.md"
 
