@@ -196,8 +196,7 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
 
     // write into temporary file first
     let tempdir = tempfile::tempdir_in(target_parent_dir)?;
-    let mut tempfile_path = tempdir.into_path();
-    tempfile_path.push("tmpfile");
+    let tempfile_path = tempdir.path().join("tmpfile");
 
     {
         let mut target = fs::File::create(&tempfile_path)?;
