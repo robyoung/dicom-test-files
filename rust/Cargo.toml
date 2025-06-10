@@ -20,7 +20,7 @@ sha2 = "0.10"
 tempfile = "3.3.0"
 
 [dependencies.zstd]
-version = "0.12.4"
+version = "0.13"
 default-features = false
 optional = true
 
