@@ -15,7 +15,7 @@ default = ["zstd"]
 zstd = ["dep:zstd"]
 
 [dependencies]
-ureq = "2.4"
+ureq = "3.0"
 sha2 = "0.10"
 tempfile = "3.3.0"
 
