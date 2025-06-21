@@ -190,7 +190,7 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     fs::create_dir_all(target_parent_dir)?;
 
     let url = base_url().map_err(Error::ResolveUrl)?.to_owned() + file_entry.real_file_name();
-    let resp = ureq::get(&url)
+    let resp = ureq::get(url.as_ref())
         .call()
         .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
 
@@ -200,7 +200,7 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
 
     {
         let mut target = fs::File::create(&tempfile_path)?;
-        std::io::copy(&mut resp.into_reader(), &mut target)?;
+        std::io::copy(&mut resp.into_body().as_reader(), &mut target)?;
     }
 
     check_hash(&tempfile_path, file_entry)?;
