@@ -18,9 +18,9 @@
 //! # Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ## Source of data
-//! 
+//!
 //! By default,
 //! all data sets are hosted in
 //! the `dicom-test-files` project's [main repository][1],
@@ -31,29 +31,28 @@
 //! you can set the environment variable `DICOM_TEST_FILES_URL`
 //! to the base path of the data set's raw contents
 //! (usually ending with `data` or `data/`).
-//! 
+//!
 //! ```sh
 //! set DICOM_TEST_FILES_URL=https://raw.githubusercontent.com/Me/dicom-test-files/new/more-dicom/data
 //! cargo test
 //! ```
-//! 
+//!
 //! [1]: https://github.com/robyoung/dicom-test-files/tree/master/data
 
 #![deny(missing_docs)]
 
 use sha2::{Digest, Sha256};
-use test_file::{TestFile, Compression};
 use std::{
     borrow::Cow,
     env::{self, VarError},
     fs, io,
     path::{Path, PathBuf},
 };
+use test_file::{Compression, TestFile};
 
 mod entries;
 
 pub(crate) mod test_file;
-
 
 use entries::FILE_ENTRIES;
 
@@ -74,7 +73,7 @@ pub enum Error {
     Io(io::Error),
     /// Failed to resolve data source URL
     ResolveUrl(VarError),
-    /// Feature "zstd" is required for this file 
+    /// Feature "zstd" is required for this file
     ZstdRequired,
 }
 
@@ -116,7 +115,7 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
 pub fn all() -> Result<Vec<PathBuf>, Error> {
     FILE_ENTRIES
         .iter()
-        .map(|TestFile { name, ..}| path(name))
+        .map(|TestFile { name, .. }| path(name))
         .collect::<Result<Vec<PathBuf>, Error>>()
 }
 
@@ -207,7 +206,7 @@ fn download(name: &str, cached_path: &Path) -> Result<(), Error> {
         Compression::None => {
             // move to target destination
             fs::rename(tempfile_path, cached_path)?;
-        },
+        }
         Compression::Zstd => {
             // decode and write to target destination
             write_zstd(tempfile_path.as_path(), cached_path)?;
