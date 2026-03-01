@@ -171,8 +171,7 @@ fn base_url() -> Result<Cow<'static, str>, VarError> {
                 // GITHUB_HEAD_REF: name of the branch when it's a pull request
                 let github_head_ref = std::env::var("GITHUB_HEAD_REF")?;
                 let url = format!(
-                    "{}/{}/{}/data/",
-                    RAW_GITHUBUSERCONTENT_URL, github_repository, github_head_ref
+                    "{RAW_GITHUBUSERCONTENT_URL}/{github_repository}/{github_head_ref}/data/",
                 );
 
                 return Ok(url.into());
@@ -192,7 +191,7 @@ fn download(name: &str, cached_path: &Path) -> Result<(), Error> {
     let url = base_url().map_err(Error::ResolveUrl)?.into_owned() + &file_entry.real_file_name();
     let resp = ureq::get(&url)
         .call()
-        .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
+        .map_err(|e| Error::Download(format!("Failed to download {url}: {e}")))?;
 
     // write into temporary file first
     let tempdir = tempfile::tempdir_in(target_parent_dir)?;
@@ -215,7 +214,7 @@ fn download(name: &str, cached_path: &Path) -> Result<(), Error> {
 
             // remove temporary file
             fs::remove_file(tempfile_path).unwrap_or_else(|e| {
-                eprintln!("[dicom-test-files] Failed to remove temporary file: {}", e);
+                eprintln!("[dicom-test-files] Failed to remove temporary file: {e}");
             });
         }
     }
