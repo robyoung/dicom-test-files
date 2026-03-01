@@ -147,7 +147,7 @@ const RAW_GITHUBUSERCONTENT_URL: &str = "https://raw.githubusercontent.com";
 /// use the contents provided through the pull request's head branch.
 fn base_url() -> Result<Cow<'static, str>, VarError> {
     if let Ok(url) = std::env::var("DICOM_TEST_FILES_URL") {
-        if url != "" {
+        if !url.is_empty() {
             let url = if !url.ends_with("/") {
                 format!("{url}/")
             } else {
@@ -183,14 +183,14 @@ fn base_url() -> Result<Cow<'static, str>, VarError> {
     Ok(DEFAULT_GITHUB_BASE_URL.into())
 }
 
-fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
+fn download(name: &str, cached_path: &Path) -> Result<(), Error> {
     let file_entry = lookup(name).ok_or(Error::NotFound)?;
 
-    let target_parent_dir = cached_path.as_path().parent().unwrap();
+    let target_parent_dir = cached_path.parent().unwrap();
     fs::create_dir_all(target_parent_dir)?;
 
-    let url = base_url().map_err(Error::ResolveUrl)?.to_owned() + file_entry.real_file_name();
-    let resp = ureq::get(url.as_ref())
+    let url = base_url().map_err(Error::ResolveUrl)?.into_owned() + &file_entry.real_file_name();
+    let resp = ureq::get(&url)
         .call()
         .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
 
@@ -207,11 +207,11 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     match file_entry.compression {
         Compression::None => {
             // move to target destination
-            fs::rename(tempfile_path, cached_path.as_path())?;
+            fs::rename(tempfile_path, cached_path)?;
         },
         Compression::Zstd => {
             // decode and write to target destination
-            write_zstd(tempfile_path.as_path(), cached_path.as_path())?;
+            write_zstd(tempfile_path.as_path(), cached_path)?;
 
             // remove temporary file
             fs::remove_file(tempfile_path).unwrap_or_else(|e| {
