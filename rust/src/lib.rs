@@ -18,9 +18,9 @@
 //! # Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ## Source of data
-//! 
+//!
 //! By default,
 //! all data sets are hosted in
 //! the `dicom-test-files` project's [main repository][1],
@@ -31,29 +31,28 @@
 //! you can set the environment variable `DICOM_TEST_FILES_URL`
 //! to the base path of the data set's raw contents
 //! (usually ending with `data` or `data/`).
-//! 
+//!
 //! ```sh
 //! set DICOM_TEST_FILES_URL=https://raw.githubusercontent.com/Me/dicom-test-files/new/more-dicom/data
 //! cargo test
 //! ```
-//! 
+//!
 //! [1]: https://github.com/robyoung/dicom-test-files/tree/master/data
 
 #![deny(missing_docs)]
 
 use sha2::{Digest, Sha256};
-use test_file::{TestFile, Compression};
 use std::{
     borrow::Cow,
     env::{self, VarError},
     fs, io,
     path::{Path, PathBuf},
 };
+use test_file::{Compression, TestFile};
 
 mod entries;
 
 pub(crate) mod test_file;
-
 
 use entries::FILE_ENTRIES;
 
@@ -74,7 +73,7 @@ pub enum Error {
     Io(io::Error),
     /// Failed to resolve data source URL
     ResolveUrl(VarError),
-    /// Feature "zstd" is required for this file 
+    /// Feature "zstd" is required for this file
     ZstdRequired,
 }
 
@@ -116,7 +115,7 @@ pub fn path(name: &str) -> Result<PathBuf, Error> {
 pub fn all() -> Result<Vec<PathBuf>, Error> {
     FILE_ENTRIES
         .iter()
-        .map(|TestFile { name, ..}| path(name))
+        .map(|TestFile { name, .. }| path(name))
         .collect::<Result<Vec<PathBuf>, Error>>()
 }
 
@@ -147,7 +146,7 @@ const RAW_GITHUBUSERCONTENT_URL: &str = "https://raw.githubusercontent.com";
 /// use the contents provided through the pull request's head branch.
 fn base_url() -> Result<Cow<'static, str>, VarError> {
     if let Ok(url) = std::env::var("DICOM_TEST_FILES_URL") {
-        if url != "" {
+        if !url.is_empty() {
             let url = if !url.ends_with("/") {
                 format!("{url}/")
             } else {
@@ -171,8 +170,7 @@ fn base_url() -> Result<Cow<'static, str>, VarError> {
                 // GITHUB_HEAD_REF: name of the branch when it's a pull request
                 let github_head_ref = std::env::var("GITHUB_HEAD_REF")?;
                 let url = format!(
-                    "{}/{}/{}/data/",
-                    RAW_GITHUBUSERCONTENT_URL, github_repository, github_head_ref
+                    "{RAW_GITHUBUSERCONTENT_URL}/{github_repository}/{github_head_ref}/data/",
                 );
 
                 return Ok(url.into());
@@ -183,16 +181,16 @@ fn base_url() -> Result<Cow<'static, str>, VarError> {
     Ok(DEFAULT_GITHUB_BASE_URL.into())
 }
 
-fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
+fn download(name: &str, cached_path: &Path) -> Result<(), Error> {
     let file_entry = lookup(name).ok_or(Error::NotFound)?;
 
-    let target_parent_dir = cached_path.as_path().parent().unwrap();
+    let target_parent_dir = cached_path.parent().unwrap();
     fs::create_dir_all(target_parent_dir)?;
 
-    let url = base_url().map_err(Error::ResolveUrl)?.to_owned() + file_entry.real_file_name();
-    let resp = ureq::get(url.as_ref())
+    let url = base_url().map_err(Error::ResolveUrl)?.into_owned() + &file_entry.real_file_name();
+    let resp = ureq::get(&url)
         .call()
-        .map_err(|e| Error::Download(format!("Failed to download {}: {}", url, e)))?;
+        .map_err(|e| Error::Download(format!("Failed to download {url}: {e}")))?;
 
     // write into temporary file first
     let tempdir = tempfile::tempdir_in(target_parent_dir)?;
@@ -207,15 +205,15 @@ fn download(name: &str, cached_path: &PathBuf) -> Result<(), Error> {
     match file_entry.compression {
         Compression::None => {
             // move to target destination
-            fs::rename(tempfile_path, cached_path.as_path())?;
-        },
+            fs::rename(tempfile_path, cached_path)?;
+        }
         Compression::Zstd => {
             // decode and write to target destination
-            write_zstd(tempfile_path.as_path(), cached_path.as_path())?;
+            write_zstd(tempfile_path.as_path(), cached_path)?;
 
             // remove temporary file
             fs::remove_file(tempfile_path).unwrap_or_else(|e| {
-                eprintln!("[dicom-test-files] Failed to remove temporary file: {}", e);
+                eprintln!("[dicom-test-files] Failed to remove temporary file: {e}");
             });
         }
     }
