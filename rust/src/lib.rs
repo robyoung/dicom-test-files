@@ -304,6 +304,26 @@ mod tests {
         assert_eq!(metadata.len(), 527066);
     }
 
+    /// Ensure that it can load a segmentation from dcmqi test dataset
+    #[cfg(feature = "zstd")]
+    #[test]
+    fn load_path_dcmqi_segmentation() {
+        const FILE: &str = "dcmqi/segmentations/23x38x3/multiframe/mf.dcm";
+        // ensure it does not exist beforehand
+        let cached_path = get_data_path().join(FILE);
+        let _ = fs::remove_file(cached_path);
+
+        let path = path(FILE).unwrap();
+        let path = path.as_path();
+
+        assert_eq!(path.file_name().unwrap(), "mf.dcm");
+        assert!(path.exists());
+
+        let metadata = std::fs::metadata(path).unwrap();
+        // check size
+        assert_eq!(metadata.len(), 8016);
+    }
+
     fn load_a_single_path_2() {
         // ensure it does not exist
         let cached_path = get_data_path().join("pydicom/CT_small.dcm");
