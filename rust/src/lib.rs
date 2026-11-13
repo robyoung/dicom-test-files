@@ -1,4 +1,4 @@
-//! A collection of DICOM files for testing DICOM parsers.
+//! A collection of DICOM files for testing DICOM implementations.
 //!
 //! To avoid users having to download all the files they are downloaded as they
 //! are needed and cached in the `/target` directory.
@@ -13,7 +13,7 @@
 //! let liver = path("pydicom/liver.dcm")?;
 //! // then open the file as you will (e.g. using DICOM-rs)
 //! # /*
-//! let dicom_data = dicom::object::open(liver);
+//! let dicom_data = dicom::object::open_file(liver)?;
 //! # */
 //! # Ok(())
 //! # }
@@ -41,6 +41,7 @@
 
 #![deny(missing_docs)]
 
+use digest_io::IoWrapper;
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
@@ -236,11 +237,11 @@ fn write_zstd(_source_path: impl AsRef<Path>, _cached_path: impl AsRef<Path>) ->
 
 fn check_hash(path: impl AsRef<Path>, file_entry: &TestFile) -> Result<()> {
     let mut file = fs::File::open(path.as_ref())?;
-    let mut hasher = Sha256::new();
+    let mut hasher = IoWrapper(Sha256::new());
     io::copy(&mut file, &mut hasher)?;
-    let hash = hasher.finalize();
+    let hash = hasher.0.finalize();
 
-    if format!("{:x}", hash) != file_entry.hash {
+    if format!("{:x}", base16ct::HexDisplay(&hash)) != file_entry.hash {
         fs::remove_file(path)?;
         return Err(Error::InvalidHash);
     }
