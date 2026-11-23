@@ -3,7 +3,7 @@ name = "dicom-test-files"
 version = "0.4.0"
 authors = ["Rob Young <rob@robyoung.digital>", "Eduardo Pinho <enet4mikeenet@gmail.com>"]
 edition = "2021"
-description = "A collection of DICOM files for testing DICOM parsers." 
+description = "A collection of DICOM files for testing DICOM implementations."
 repository = "https://github.com/robyoung/dicom-test-files"
 license-file = "../LICENSE.txt"
 keywords = ["DICOM", "medical", "image", "dataset"]
@@ -16,13 +16,12 @@ zstd = ["dep:zstd"]
 
 [dependencies]
 ureq = "3.0"
-sha2 = "0.10"
+sha2 = "0.11"
 tempfile = "3.3.0"
+digest-io = "0.1.0"
+base16ct = "1.0.0"
 
 [dependencies.zstd]
-version = "0.13"
+version = "0.14"
 default-features = false
 optional = true
-
-[build-dependencies]
-sha2 = "0.10"

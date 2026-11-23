@@ -6,6 +6,14 @@ This repository collects together example DICOM files from various sources.
 The intention is that they can be used
 for testing across many different libraries.
 
+## Using
+
+```rust
+let liver = path("pydicom/liver.dcm")?;
+// then open the file as you will (e.g. using DICOM-rs)
+let dicom_data = dicom::object::open_file(liver)?;
+```
+
 See the [documentation](https://docs.rs/dicom-test-files)
 for instructions of use.
 
